@@ -29,6 +29,7 @@ class Vocab():
             sents = doc.split(split_token)
             labels = label.split(split_token)
             labels = [int(l) for l in labels]
+            #rationale_labels = rationale.split(split_token)
             max_sent_num = min(doc_trunc,len(sents))
             sents = sents[:max_sent_num]
             labels = labels[:max_sent_num]
@@ -42,6 +43,8 @@ class Vocab():
             words = sent.split()
             if len(words) > sent_trunc:
                 words = words[:sent_trunc]
+            if len(words) == 0:
+                print(sents_list)
             max_sent_len = len(words) if len(words) > max_sent_len else max_sent_len
             batch_sents.append(words)
         

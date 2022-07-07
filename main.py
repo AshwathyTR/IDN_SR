@@ -71,7 +71,7 @@ def eval(net,vocab,data_iter,criterion):
     total_loss = 0
     batch_num = 0
     for batch in data_iter:
-        features,targets,_,doc_lens = vocab.make_features(batch)
+        features,targets,_,doc_lens = vocab.make_features(batch,  doc_trunc = args.pos_num)
         features,targets = Variable(features), Variable(targets.float())
         if use_gpu:
             features = features.cuda()
@@ -129,12 +129,12 @@ def train():
     t1 = time() 
     for epoch in range(1,args.epochs+1):
         for i,batch in enumerate(train_iter):
-            features,targets,_,doc_lens = vocab.make_features(batch)
+            features,targets,_,doc_lens = vocab.make_features(batch, doc_trunc = args.pos_num)
             features,targets = Variable(features), Variable(targets.float())
             if use_gpu:
                 features = features.cuda()
                 targets = targets.cuda()
-            probs = net(features,doc_lens)
+                probs = net(features,doc_lens)
             loss = criterion(probs,targets)
             optimizer.zero_grad()
             loss.backward()
@@ -185,8 +185,14 @@ def test():
     doc_num = len(test_dataset)
     time_cost = 0
     file_id = 1
+    with open(os.path.join(args.ref,'ref.txt'), 'w') as f:
+         pass
+    with open(os.path.join(args.hyp,'hyp.txt'), 'w') as f:
+         pass
     for batch in tqdm(test_iter):
-        features,_,summaries,doc_lens = vocab.make_features(batch)
+        print("pos_num: "+ str(args.pos_num))
+        features,_,summaries,doc_lens = vocab.make_features(batch, doc_trunc = args.pos_num)
+        print(doc_lens)
         t1 = time()
         if use_gpu:
             probs = net(Variable(features).cuda(), doc_lens)
@@ -204,10 +210,10 @@ def test():
             doc = batch['doc'][doc_id].split('\n')[:doc_len]
             hyp = [doc[index] for index in topk_indices]
             ref = summaries[doc_id]
-            with open(os.path.join(args.ref,str(file_id)+'.txt'), 'w') as f:
-                f.write(ref)
-            with open(os.path.join(args.hyp,str(file_id)+'.txt'), 'w') as f:
-                f.write('\n'.join(hyp))
+            with open(os.path.join(args.ref,'ref.txt'), 'a') as f:
+                f.write(ref+'<<END>>')
+            with open(os.path.join(args.hyp,'hyp.txt'), 'a') as f:
+                f.write('\n'.join(hyp)+'<<END>>')
             start = stop
             file_id = file_id + 1
     print('Speed: %.2f docs / s' % (doc_num / time_cost))
@@ -242,7 +248,8 @@ def predict(examples):
     time_cost = 0
     file_id = 1
     for batch in tqdm(pred_iter):
-        features, doc_lens = vocab.make_predict_features(batch)
+        features, doc_lens = vocab.make_predict_features(batch, doc_trunc = args.pos_num)
+        print(doc_lens)
         t1 = time()
         if use_gpu:
             probs = net(Variable(features).cuda(), doc_lens)
