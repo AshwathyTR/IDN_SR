@@ -83,8 +83,11 @@ class AttnRNN(BasicModule):
         # attention
         query = self.sent_query.expand(B,-1,-1).contiguous()
         self.attn.set_mask(sent_mask)
-        docs = self.attn(query,x)[0].squeeze(1)      # (B,2*H)
+        at_out, at_scores = self.attn(query,x)
+        docs = at_out.squeeze(1)      # (B,2*H)
+        at_scores = at_scores.squeeze(1)
         probs = []
+        
         for index,doc_len in enumerate(doc_lens):
             valid_hidden = sent_out[index,:doc_len,:]                            # (doc_len,2*H)
             doc = F.tanh(self.fc(docs[index])).unsqueeze(0)
@@ -115,4 +118,4 @@ class AttnRNN(BasicModule):
                 s = s + torch.mm(prob,h)
                 #print position,F.sigmoid(abs_p + rel_p)
                 probs.append(prob)
-        return torch.cat(probs).squeeze()
+        return torch.cat(probs).squeeze(), at_scores

@@ -23,18 +23,21 @@ class Vocab():
             return self.UNK_IDX
     
     def make_features(self,batch,sent_trunc=50,doc_trunc=100,split_token='\n'):
-        sents_list,targets,doc_lens = [],[],[]
+        sents_list,targets,rationale_targets,doc_lens = [],[],[],[]
         # trunc document
-        for doc,label in zip(batch['doc'],batch['labels']):
+        for doc,rationale,label in zip(batch['doc'],batch['rationale'],batch['labels']):
             sents = doc.split(split_token)
             labels = label.split(split_token)
             labels = [int(l) for l in labels]
-            #rationale_labels = rationale.split(split_token)
+            rationale_labels = rationale.split(split_token)
+            rationale_labels = [int(l) for l in rationale_labels]
             max_sent_num = min(doc_trunc,len(sents))
             sents = sents[:max_sent_num]
             labels = labels[:max_sent_num]
+            rationale_labels = rationale_labels[:max_sent_num]
             sents_list += sents
             targets += labels
+            rationale_targets += rationale_labels
             doc_lens.append(len(sents))
         # trunc or pad sent
         max_sent_len = 0
@@ -55,9 +58,10 @@ class Vocab():
         
         features = torch.LongTensor(features)    
         targets = torch.LongTensor(targets)
+        rationales =  torch.LongTensor(rationale_targets)
         summaries = batch['summaries']
 
-        return features,targets,summaries,doc_lens
+        return features,targets,rationales,summaries,doc_lens
 
     def make_predict_features(self, batch, sent_trunc=150, doc_trunc=100, split_token='. '):
         sents_list, doc_lens = [],[]

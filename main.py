@@ -71,14 +71,16 @@ def eval(net,vocab,data_iter,criterion):
     total_loss = 0
     batch_num = 0
     for batch in data_iter:
-        features,targets,_,doc_lens = vocab.make_features(batch,  doc_trunc = args.pos_num)
-        features,targets = Variable(features), Variable(targets.float())
+        features,targets,rationale,_,doc_lens = vocab.make_features(batch,  doc_trunc = args.pos_num)
+        features,targets,rationale = Variable(features), Variable(targets.float()), Variable(rationale.float())
         if use_gpu:
             features = features.cuda()
             targets = targets.cuda()
-        probs = net(features,doc_lens)
-        loss = criterion(probs,targets)
-        total_loss += loss.data[0]
+            rationale = rationale.cuda()
+        probs,alpha = net(features,doc_lens)
+        alpha = alpha.view(rationale.shape)
+        loss = criterion(probs,targets)+ criterion(alpha, rationale)
+        total_loss += loss.data
         batch_num += 1
     loss = total_loss / batch_num
     net.train()
@@ -129,13 +131,16 @@ def train():
     t1 = time() 
     for epoch in range(1,args.epochs+1):
         for i,batch in enumerate(train_iter):
-            features,targets,_,doc_lens = vocab.make_features(batch, doc_trunc = args.pos_num)
-            features,targets = Variable(features), Variable(targets.float())
+            features,targets,rationale,_,doc_lens = vocab.make_features(batch, doc_trunc = args.pos_num)
+            features,targets,rationale = Variable(features), Variable(targets.float()), Variable(rationale.float())
             if use_gpu:
                 features = features.cuda()
                 targets = targets.cuda()
-                probs = net(features,doc_lens)
-            loss = criterion(probs,targets)
+                rationale = rationale.cuda()
+                probs, alpha = net(features,doc_lens)
+            
+            alpha = alpha.view(rationale.shape)
+            loss = criterion(probs,targets)+ criterion(alpha, rationale)
             optimizer.zero_grad()
             loss.backward()
             clip_grad_norm(net.parameters(), args.max_norm)
@@ -145,8 +150,10 @@ def train():
                 continue
             if i % args.report_every == 0:
                 cur_loss = eval(net,vocab,val_iter,criterion)
-                if cur_loss < min_loss:
-                    min_loss = cur_loss
+                print(cur_loss)
+                print(min_loss)
+                if cur_loss.tolist()[0] < min_loss:
+                    min_loss = cur_loss.tolist()[0]
                     best_path = net.save()
                 logging.info('Epoch: %2d Min_Val_Loss: %f Cur_Val_Loss: %f'
                         % (epoch,min_loss,cur_loss))
