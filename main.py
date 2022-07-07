@@ -13,6 +13,8 @@ from torch.utils.data import DataLoader
 from torch.nn.utils import clip_grad_norm
 from time import time
 from tqdm import tqdm
+#from torch.utils.tensorboard import SummaryWriter
+#writer = SummaryWriter()
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [INFO] %(message)s')
 parser = argparse.ArgumentParser(description='extractive summary')
@@ -141,6 +143,7 @@ def train():
             
             alpha = alpha.view(rationale.shape)
             loss = criterion(probs,targets)+ criterion(alpha, rationale)
+            #writer.add_scalar("Loss/train", loss, epoch)
             optimizer.zero_grad()
             loss.backward()
             clip_grad_norm(net.parameters(), args.max_norm)
@@ -158,6 +161,7 @@ def train():
                 logging.info('Epoch: %2d Min_Val_Loss: %f Cur_Val_Loss: %f'
                         % (epoch,min_loss,cur_loss))
     t2 = time()
+    #writer.flush()
     logging.info('Total Cost:%f h'%((t2-t1)/3600))
 
 def test():
@@ -198,7 +202,7 @@ def test():
          pass
     for batch in tqdm(test_iter):
         print("pos_num: "+ str(args.pos_num))
-        features,_,summaries,doc_lens = vocab.make_features(batch, doc_trunc = args.pos_num)
+        features,rationale,_,summaries,doc_lens = vocab.make_features(batch, doc_trunc = args.pos_num)
         print(doc_lens)
         t1 = time()
         if use_gpu:
@@ -265,6 +269,7 @@ def predict(examples):
         t2 = time()
         time_cost += t2 - t1
         start = 0
+        probs = probs[0]
         for doc_id,doc_len in enumerate(doc_lens):
             stop = start + doc_len
             prob = probs[start:stop]
@@ -288,3 +293,4 @@ if __name__=='__main__':
         predict(bod)
     else:
         train()
+    #writer.close()
