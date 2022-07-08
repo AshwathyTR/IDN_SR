@@ -40,7 +40,7 @@ class Attention(nn.Module):
         Args:
             mask (torch.Tensor): tensor containing indices to be masked
         """
-        self.mask = mask
+        self.mask = mask.bool()
     
     """
         - query   (batch, query_len, dimensions): tensor containing the query features from the decoder.

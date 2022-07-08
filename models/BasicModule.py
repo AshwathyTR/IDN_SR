@@ -28,7 +28,7 @@ class BasicModule(torch.nn.Module):
     
     def save(self):
         checkpoint = {'model':self.state_dict(), 'args': self.args}
-        best_path = '%s%s_seed_%d.pt' % (self.args.save_dir,self.model_name,self.args.seed)
+        best_path = '%s%s_seed_%d_alpha_%f.pt' % (self.args.save_dir,self.model_name,self.args.seed, self.args.alpha_loss)
         torch.save(checkpoint,best_path)
 
         return best_path

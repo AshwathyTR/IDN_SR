@@ -54,6 +54,8 @@ parser.add_argument('-device',type=int)
 parser.add_argument('-test',action='store_true')
 parser.add_argument('-debug',action='store_true')
 parser.add_argument('-predict',action='store_true')
+
+parser.add_argument('-alpha_loss',type=float, default=0.5)
 args = parser.parse_args()
 use_gpu = args.device is not None
 
@@ -81,7 +83,7 @@ def eval(net,vocab,data_iter,criterion):
             rationale = rationale.cuda()
         probs,alpha = net(features,doc_lens)
         alpha = alpha.view(rationale.shape)
-        loss = criterion(probs,targets)+ criterion(alpha, rationale)
+        loss = args.alpha_loss * criterion(probs,targets)+ (1 - args.alpha_loss) * criterion(alpha, rationale)
         total_loss += loss.data
         batch_num += 1
     loss = total_loss / batch_num
@@ -142,7 +144,7 @@ def train():
                 probs, alpha = net(features,doc_lens)
             
             alpha = alpha.view(rationale.shape)
-            loss = criterion(probs,targets)+ criterion(alpha, rationale)
+            loss = args.alpha_loss * criterion(probs,targets)+ (1 - args.alpha_loss) * criterion(alpha, rationale)
             #writer.add_scalar("Loss/train", loss, epoch)
             optimizer.zero_grad()
             loss.backward()
@@ -155,8 +157,8 @@ def train():
                 cur_loss = eval(net,vocab,val_iter,criterion)
                 print(cur_loss)
                 print(min_loss)
-                if cur_loss.tolist()[0] < min_loss:
-                    min_loss = cur_loss.tolist()[0]
+                if cur_loss < min_loss:
+                    min_loss = cur_loss
                     best_path = net.save()
                 logging.info('Epoch: %2d Min_Val_Loss: %f Cur_Val_Loss: %f'
                         % (epoch,min_loss,cur_loss))
