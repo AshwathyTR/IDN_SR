@@ -8,10 +8,10 @@ import torch.nn.functional as F
 from .Attention import Attention
 from torch.autograd import Variable
 
-class AttnRNN(BasicModule):
+class AttnRNNW(BasicModule):
     def __init__(self, args, embed=None):
-        super(AttnRNN,self).__init__(args)
-        self.model_name = 'AttnRNN'
+        super(AttnRNNW,self).__init__(args)
+        self.model_name = 'AttnRNNW'
         self.args = args
         
         V = args.embed_num
@@ -67,8 +67,11 @@ class AttnRNN(BasicModule):
         # attention
         query = self.word_query.expand(N,-1,-1).contiguous()
         self.attn.set_mask(word_mask)
-        word_out = self.attn(query,x)[0].squeeze(1)      # (N,2*H)
-
+        word_out, word_scores = self.attn(query,x)
+        print(word_scores.shape)
+        word_out = word_out.squeeze(1)      # (N,2*H)
+        word_scores = word_scores.squeeze(1)
+        print(word_scores.shape)
         x = self.pad_doc(word_out,doc_lens)
         # sent level GRU
         sent_out = self.sent_RNN(x)[0]                                           # (B,max_doc_len,2*H)
@@ -118,4 +121,4 @@ class AttnRNN(BasicModule):
                 s = s + torch.mm(prob,h)
                 #print position,F.sigmoid(abs_p + rel_p)
                 probs.append(prob)
-        return torch.cat(probs).squeeze()
+        return torch.cat(probs).squeeze(), word_scores

@@ -5,7 +5,7 @@ import os
 dpath = sys.argv[1]
 split = sys.argv[2]
 look_behind = int(sys.argv[3])
-look_ahead  = int(sys.argv[4])
+look_ahead  = int(sys.argv[3])
 path = os.path.join(dpath, split+'.json')
 
 with open(path,'r') as f:
@@ -13,7 +13,7 @@ with open(path,'r') as f:
 
 
 
-with open(path[:-5]+'_r.json','w') as f:
+with open(path[:-5]+'_r_'+str(look_behind)+'.json','w') as f:
     pass
 
 
@@ -35,7 +35,7 @@ for text in h:
     r = '\n'.join(r)
     j['rationale'] = r
     #print(r)
-    with open(path[:-5]+'_r.json','a') as f:
+    with open(path[:-5]+'_r_'+str(look_behind)+'.json','a') as f:
         json.dump(j,f)
         f.write('\n')
 

@@ -8,10 +8,10 @@ import torch.nn.functional as F
 from .Attention import Attention
 from torch.autograd import Variable
 
-class AttnRNN(BasicModule):
+class AttnRNNR(BasicModule):
     def __init__(self, args, embed=None):
-        super(AttnRNN,self).__init__(args)
-        self.model_name = 'AttnRNN'
+        super(AttnRNNR,self).__init__(args)
+        self.model_name = 'AttnRNNR'
         self.args = args
         
         V = args.embed_num
@@ -118,4 +118,4 @@ class AttnRNN(BasicModule):
                 s = s + torch.mm(prob,h)
                 #print position,F.sigmoid(abs_p + rel_p)
                 probs.append(prob)
-        return torch.cat(probs).squeeze()
+        return torch.cat(probs).squeeze(), at_scores

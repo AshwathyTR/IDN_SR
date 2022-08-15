@@ -81,9 +81,16 @@ def eval(net,vocab,data_iter,criterion):
             features = features.cuda()
             targets = targets.cuda()
             rationale = rationale.cuda()
-        probs,alpha = net(features,doc_lens)
-        alpha = alpha.view(rationale.shape)
-        loss = args.alpha_loss * criterion(probs,targets)+ (1 - args.alpha_loss) * criterion(alpha, rationale)
+        if args.model == 'AttnRNNR' or args.model == 'AttnRNNW':
+            probs,alpha = net(features,doc_lens)
+            alpha = alpha.view(rationale.shape)
+        else:
+            probs = net(features,doc_lens)
+        if args.model == 'AttnRNNR' or args.model == 'AttnRNNW':
+                loss = args.alpha_loss * criterion(probs,targets)+ (1 - args.alpha_loss) * criterion(alpha, rationale)
+        else:
+                loss = criterion(probs,targets)
+            
         total_loss += loss.data
         batch_num += 1
     loss = total_loss / batch_num
@@ -135,16 +142,29 @@ def train():
     t1 = time() 
     for epoch in range(1,args.epochs+1):
         for i,batch in enumerate(train_iter):
-            features,targets,rationale,_,doc_lens = vocab.make_features(batch, doc_trunc = args.pos_num)
+            if args.model == 'AttnRNNW':
+                rationale_type = 'word'
+            elif args.model == 'AttnRNNR':
+                rationale_type = 'sent'
+            else:
+                rationale_type = None
+            features,targets,rationale,_,doc_lens = vocab.make_features(batch, doc_trunc = args.pos_num, rationale_type = rationale_type)
             features,targets,rationale = Variable(features), Variable(targets.float()), Variable(rationale.float())
+            print("rationale: "+ str(rationale.shape))
+            print("features: "+ str(features.shape))
             if use_gpu:
                 features = features.cuda()
                 targets = targets.cuda()
                 rationale = rationale.cuda()
+            if args.model == 'AttnRNNR' or args.model == 'AttnRNNW':
                 probs, alpha = net(features,doc_lens)
-            
-            alpha = alpha.view(rationale.shape)
-            loss = args.alpha_loss * criterion(probs,targets)+ (1 - args.alpha_loss) * criterion(alpha, rationale)
+                alpha = alpha.view(rationale.shape)
+            else:
+                probs = net(features,doc_lens)
+            if args.model == 'AttnRNNR' or args.model == 'AttnRNNW':
+                loss = args.alpha_loss * criterion(probs,targets)+ (1 - args.alpha_loss) * criterion(alpha, rationale)
+            else:
+                loss = criterion(probs,targets)
             #writer.add_scalar("Loss/train", loss, epoch)
             optimizer.zero_grad()
             loss.backward()
@@ -208,15 +228,20 @@ def test():
         print(doc_lens)
         t1 = time()
         if use_gpu:
-            probs = net(Variable(features).cuda(), doc_lens)
+            features = Variable(features).cuda()
         else:
-            probs = net(Variable(features), doc_lens)
+            features = Variable(features)
+        if args.model == 'AttnRNNR' or args.model == 'AttnRNNW':
+            probs, alpha = net(features, doc_lens)
+        else:
+            probs = net(features, doc_lens)
         t2 = time()
         time_cost += t2 - t1
         start = 0
         for doc_id,doc_len in enumerate(doc_lens):
             stop = start + doc_len
             prob = probs[start:stop]
+            print(prob)
             topk = min(args.topk,doc_len)
             topk_indices = prob.topk(topk)[1].cpu().data.numpy()
             topk_indices.sort()

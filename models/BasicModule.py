@@ -28,7 +28,12 @@ class BasicModule(torch.nn.Module):
     
     def save(self):
         checkpoint = {'model':self.state_dict(), 'args': self.args}
-        best_path = '%s%s_seed_%d_alpha_%f.pt' % (self.args.save_dir,self.model_name,self.args.seed, self.args.alpha_loss)
+        if self.model_name == 'AttnRNNR':
+            best_path = '%s%s_seed_%d_alpha_%f.pt' % (self.args.save_dir,self.model_name,self.args.seed, self.args.alpha_loss)
+        elif self.model_name == 'AttnRNNW':
+            best_path = '%s%s_seed_%d_alphaw_%f.pt' % (self.args.save_dir,self.model_name,self.args.seed, self.args.alpha_loss)
+        else:
+            best_path = '%s%s_seed_%d.pt' % (self.args.save_dir,self.model_name,self.args.seed)
         torch.save(checkpoint,best_path)
 
         return best_path
