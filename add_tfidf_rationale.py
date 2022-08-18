@@ -25,26 +25,28 @@ for text in h:
     corpus.append(d)
 
 X = vectorizer.fit_transform(corpus)
-tf_idf = dict(zip(vectorizer.get_feature_names(), X.toarray()[index]))
     
 for doc_id, text in enumerate(h):
     j = json.loads(text)
     d = j['doc']
     s= d.split('\n')
     r = []
-    for index in range(0,len(s)):
-        window = '\n'.join(s[max(0,index - look_behind) : index + look_ahead])
-        #print(index)
-        #print(window)
-        #print('..............')
-        
-        if 'choice :' in window.lower():
-            r.append(1.0)
-            #print(index)
-        else:
-            r.append(0.0)
+    w = sum([sent.split(' ') for sent in s],[])
+    word_index = 0
     tf_idf = dict(zip(vectorizer.get_feature_names(), X.toarray()[doc_id]))
-    r = [str(mask * score) for mask, score in zip(r, tf_idf)]
+    for index, sentence in enumerate(s):
+        sentence_r = []
+        for w_index, word in enumerate(sentence.split(' ')):
+            word_index = word_index +1
+            window = ' '.join(w[max(0,word_index - look_behind) : word_index + look_ahead])
+             
+            if 'choice :' in window.lower():
+                sentence_r.append(str(tf_idf['word']))
+                #print(index)
+            else:
+                sentence_r.append(str(0.0))
+        sentence_r = ' '.join(sentence_r)
+        r.append(sentence_r)
     r = '\n'.join(r)
     j['rationale'] = r
     #print(r)

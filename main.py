@@ -74,8 +74,14 @@ def eval(net,vocab,data_iter,criterion):
     net.eval()
     total_loss = 0
     batch_num = 0
+    if args.model == 'AttnRNNW':
+                rationale_type = 'word'
+    elif args.model == 'AttnRNNR':
+                rationale_type = 'sent'
+    else:
+                rationale_type = None
     for batch in data_iter:
-        features,targets,rationale,_,doc_lens = vocab.make_features(batch,  doc_trunc = args.pos_num)
+        features,targets,rationale,_,doc_lens = vocab.make_features(batch,  doc_trunc = args.pos_num, rationale_type = rationale_type)
         features,targets,rationale = Variable(features), Variable(targets.float()), Variable(rationale.float())
         if use_gpu:
             features = features.cuda()
@@ -156,6 +162,12 @@ def train():
                 features = features.cuda()
                 targets = targets.cuda()
                 rationale = rationale.cuda()
+            if args.model == 'AttnRNNW':
+                rationale_type = 'word'
+            elif args.model == 'AttnRNNR':
+                rationale_type = 'sent'
+            else:
+                rationale_type = None
             if args.model == 'AttnRNNR' or args.model == 'AttnRNNW':
                 probs, alpha = net(features,doc_lens)
                 alpha = alpha.view(rationale.shape)
@@ -218,13 +230,19 @@ def test():
     doc_num = len(test_dataset)
     time_cost = 0
     file_id = 1
+    if args.model == 'AttnRNNW':
+                rationale_type = 'word'
+    elif args.model == 'AttnRNNR':
+                rationale_type = 'sent'
+    else:
+                rationale_type = None
     with open(os.path.join(args.ref,'ref.txt'), 'w') as f:
          pass
     with open(os.path.join(args.hyp,'hyp.txt'), 'w') as f:
          pass
     for batch in tqdm(test_iter):
         print("pos_num: "+ str(args.pos_num))
-        features,rationale,_,summaries,doc_lens = vocab.make_features(batch, doc_trunc = args.pos_num)
+        features,rationale,_,summaries,doc_lens = vocab.make_features(batch, doc_trunc = args.pos_num, rationale_type = rationale_type)
         print(doc_lens)
         t1 = time()
         if use_gpu:

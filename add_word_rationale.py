@@ -24,7 +24,7 @@ for text in h:
     word_index = 0
     for index, sentence in enumerate(s):
         sentence_r = []
-        for w_index, word in enumerate(sentence):
+        for w_index, word in enumerate(sentence.split(' ')):
             word_index = word_index +1
             window = ' '.join(w[max(0,word_index - look_behind) : word_index + look_ahead])
         #print(index)
