@@ -13,7 +13,7 @@ class AttnRNNW(BasicModule):
         super(AttnRNNW,self).__init__(args)
         self.model_name = 'AttnRNNW'
         self.args = args
-        
+        drop = self.args.dropout
         V = args.embed_num
         D = args.embed_dim
         H = args.hidden_size
@@ -44,6 +44,7 @@ class AttnRNNW(BasicModule):
                         bidirectional = True
                         )
                
+        self.dropout = nn.Dropout(drop)
         self.fc = nn.Linear(2*H,2*H)
 
         # Parameters of Classification Layer
@@ -56,7 +57,7 @@ class AttnRNNW(BasicModule):
     def forward(self,x,doc_lens):
         N = x.size(0)
         L = x.size(1)
-        B = len(doc_lens)
+        B = int(N/self.args.pos_num) 
         H = self.args.hidden_size
         word_mask = torch.ones_like(x) - torch.sign(x)
         word_mask = word_mask.data.type(torch.cuda.ByteTensor).view(N,1,L)
@@ -68,10 +69,10 @@ class AttnRNNW(BasicModule):
         query = self.word_query.expand(N,-1,-1).contiguous()
         self.attn.set_mask(word_mask)
         word_out, word_scores = self.attn(query,x)
-        print(word_scores.shape)
+        #print(word_scores.shape)
         word_out = word_out.squeeze(1)      # (N,2*H)
         word_scores = word_scores.squeeze(1)
-        print(word_scores.shape)
+        #print(word_scores.shape)
         x = self.pad_doc(word_out,doc_lens)
         # sent level GRU
         sent_out = self.sent_RNN(x)[0]                                           # (B,max_doc_len,2*H)
@@ -91,9 +92,11 @@ class AttnRNNW(BasicModule):
         at_scores = at_scores.squeeze(1)
         probs = []
         
-        for index,doc_len in enumerate(doc_lens):
+        for index in range(0,B):
+            doc_len = self.args.pos_num
             valid_hidden = sent_out[index,:doc_len,:]                            # (doc_len,2*H)
             doc = F.tanh(self.fc(docs[index])).unsqueeze(0)
+            doc = self.dropout(doc)
             s = Variable(torch.zeros(1,2*H))
             if self.args.device is not None:
                 s = s.cuda()
@@ -113,8 +116,11 @@ class AttnRNNW(BasicModule):
                 
                 # classification layer
                 content = self.content(h) 
+                content = self.dropout(content)
                 salience = self.salience(h,doc)
+                salience = self.dropout(salience)
                 novelty = -1 * self.novelty(h,F.tanh(s))
+                novelty = self.dropout(novelty)
                 abs_p = self.abs_pos(abs_features)
                 rel_p = self.rel_pos(rel_features)
                 prob = F.sigmoid(content + salience + novelty + abs_p + rel_p + self.bias)

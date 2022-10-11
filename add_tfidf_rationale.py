@@ -41,7 +41,7 @@ for doc_id, text in enumerate(h):
             window = ' '.join(w[max(0,word_index - look_behind) : word_index + look_ahead])
              
             if 'choice :' in window.lower():
-                sentence_r.append(str(tf_idf['word']))
+                sentence_r.append(str(tf_idf[word]))
                 #print(index)
             else:
                 sentence_r.append(str(0.0))

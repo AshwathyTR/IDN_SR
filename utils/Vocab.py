@@ -30,18 +30,37 @@ class Vocab():
             sents = doc.split(split_token)
             labels = label.split(split_token)
             labels = [int(l) for l in labels]
+            assert len(sents) == len(labels)
             if rationale_type == 'sent':
                 rationale_labels = rationale.split(split_token)
                 rationale_labels = [float(l) for l in rationale_labels]
             elif rationale_type == 'word':
                 rationale_labels = rationale.split(split_token)
                 
-            max_sent_num = min(doc_trunc,len(sents))
+            max_sent_num = doc_trunc
             sents = sents[:max_sent_num]
             labels = labels[:max_sent_num]
+            assert len(sents) == len(labels)
             if rationale_type:
                 rationale_labels = rationale_labels[:max_sent_num]
                 assert len(sents) == len(rationale_labels)
+            if len(sents) < doc_trunc:
+                #print('sentlen'+str(len(sents)))
+                pad = ['\n']* (doc_trunc - len(sents))
+                #print('padsentlen'+str(len(sents)))
+                #print('labellen'+str(len(labels)))
+                labels_pad = [0]*(doc_trunc - len(sents))
+                if rationale_type:
+                    rationale_pad =  ['0']*(doc_trunc - len(sents))
+                    rationale_labels = rationale_labels + rationale_pad
+                sents = sents+pad
+                labels = labels + labels_pad
+                #print('labelpadlen'+str(labels))
+                #print(labels_pad)
+                assert len(sents) == len(labels)
+                if rationale_type:
+                    rationale_pad =  ['0']*(doc_trunc - len(sents))
+                    rationale_labels = rationale_labels + rationale_pad
             sents_list += sents
             targets += labels
             if rationale_type:
@@ -77,7 +96,8 @@ class Vocab():
             batch_sents.append(words)
         #print('max sent:'+str(max_sent_len))
         #print('max r:'+str(max_rationale_len))
-        assert max_sent_len == max_rationale_len
+        if rationale_type:
+            assert max_sent_len == max_rationale_len
         #print('max:'+str(max_sent_len))
         features = []
         for sent in batch_sents:
@@ -94,7 +114,10 @@ class Vocab():
         
         features = torch.LongTensor(features)    
         targets = torch.LongTensor(targets)
-        rationales =  torch.LongTensor(rationales)
+        if rationale_type:
+            rationales =  torch.LongTensor(rationales)
+        else:
+            rationales = torch.LongTensor([])
         summaries = batch['summaries']
 
         return features,targets,rationales,summaries,doc_lens

@@ -41,6 +41,7 @@ parser.add_argument('-word2id',type=str,default='data/word2id.json')
 parser.add_argument('-report_every',type=int,default=1500)
 parser.add_argument('-seq_trunc',type=int,default=50)
 parser.add_argument('-max_norm',type=float,default=1.0)
+parser.add_argument('-dropout',type=float,default=0.0)
 # test
 parser.add_argument('-load_dir',type=str,default='checkpoints/RNN_RNN_seed_1.pt')
 parser.add_argument('-test_dir',type=str,default='data/test.json')
@@ -92,6 +93,9 @@ def eval(net,vocab,data_iter,criterion):
             alpha = alpha.view(rationale.shape)
         else:
             probs = net(features,doc_lens)
+        #print('features'+str(features.shape))
+        #print('targets'+str(targets.shape))
+        #print('probs'+str(probs.shape))
         if args.model == 'AttnRNNR' or args.model == 'AttnRNNW':
                 loss = args.alpha_loss * criterion(probs,targets)+ (1 - args.alpha_loss) * criterion(alpha, rationale)
         else:
@@ -126,7 +130,8 @@ def train():
     # build model
     net = getattr(models,args.model)(args,embed)
     if use_gpu:
-        net.cuda()
+        net = nn.DataParallel(net,device_ids=list(range(torch.cuda.device_count()))).cuda()
+        #net.cuda()
     # load dataset
     train_iter = DataLoader(dataset=train_dataset,
             batch_size=args.batch_size,
@@ -148,6 +153,8 @@ def train():
     t1 = time() 
     for epoch in range(1,args.epochs+1):
         for i,batch in enumerate(train_iter):
+            logging.info(str(i))
+            logging.info('test')
             if args.model == 'AttnRNNW':
                 rationale_type = 'word'
             elif args.model == 'AttnRNNR':
@@ -156,8 +163,9 @@ def train():
                 rationale_type = None
             features,targets,rationale,_,doc_lens = vocab.make_features(batch, doc_trunc = args.pos_num, rationale_type = rationale_type)
             features,targets,rationale = Variable(features), Variable(targets.float()), Variable(rationale.float())
-            print("rationale: "+ str(rationale.shape))
-            print("features: "+ str(features.shape))
+            logging.info("rationale: "+ str(rationale.shape))
+            logging.info("features: "+ str(features.shape))
+            logging.info("targets: "+ str(targets.shape))
             if use_gpu:
                 features = features.cuda()
                 targets = targets.cuda()
@@ -170,6 +178,8 @@ def train():
                 rationale_type = None
             if args.model == 'AttnRNNR' or args.model == 'AttnRNNW':
                 probs, alpha = net(features,doc_lens)
+                logging.info('probs:'+str(probs.shape))
+                logging.info('alpha:'+str(alpha.shape))
                 alpha = alpha.view(rationale.shape)
             else:
                 probs = net(features,doc_lens)
@@ -178,20 +188,25 @@ def train():
             else:
                 loss = criterion(probs,targets)
             #writer.add_scalar("Loss/train", loss, epoch)
+            #logging.info('optim')
             optimizer.zero_grad()
+            #logging.info('optim1')
             loss.backward()
+            #logging.info('optim2')
             clip_grad_norm(net.parameters(), args.max_norm)
+            #logging.info('optim3')
             optimizer.step()
+            #logging.info('optim done')
             if args.debug:
                 print('Batch ID:%d Loss:%f' %(i,loss.data[0]))
                 continue
             if i % args.report_every == 0:
                 cur_loss = eval(net,vocab,val_iter,criterion)
-                print(cur_loss)
-                print(min_loss)
+                #print(cur_loss)
+                #print(min_loss)
                 if cur_loss < min_loss:
                     min_loss = cur_loss
-                    best_path = net.save()
+                    best_path = net.module.save()
                 logging.info('Epoch: %2d Min_Val_Loss: %f Cur_Val_Loss: %f'
                         % (epoch,min_loss,cur_loss))
     t2 = time()
@@ -241,9 +256,9 @@ def test():
     with open(os.path.join(args.hyp,'hyp.txt'), 'w') as f:
          pass
     for batch in tqdm(test_iter):
-        print("pos_num: "+ str(args.pos_num))
+        #print("pos_num: "+ str(args.pos_num))
         features,rationale,_,summaries,doc_lens = vocab.make_features(batch, doc_trunc = args.pos_num, rationale_type = rationale_type)
-        print(doc_lens)
+        #print(doc_lens)
         t1 = time()
         if use_gpu:
             features = Variable(features).cuda()
@@ -259,7 +274,7 @@ def test():
         for doc_id,doc_len in enumerate(doc_lens):
             stop = start + doc_len
             prob = probs[start:stop]
-            print(prob)
+            #print(prob)
             topk = min(args.topk,doc_len)
             topk_indices = prob.topk(topk)[1].cpu().data.numpy()
             topk_indices.sort()
@@ -337,5 +352,6 @@ if __name__=='__main__':
             bod = [file.read()]
         predict(bod)
     else:
+        logging.info('GPUs: '+str(torch.cuda.device_count()))
         train()
     #writer.close()

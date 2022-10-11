@@ -50,6 +50,8 @@ class Attention(nn.Module):
         batch_size = query.size(0)
         dim = query.size(2)
         in_len = context.size(1)
+        #print("query"+str(query.shape))
+        #print("context"+str(context.shape))
         # (batch, query_len, dim) * (batch, in_len, dim) -> (batch, query_len, in_len)
         attn = torch.bmm(query, context.transpose(1, 2))
         if self.mask is not None:
