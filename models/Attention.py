@@ -59,6 +59,7 @@ class Attention(nn.Module):
         attn_scores = F.softmax(attn.view(-1, in_len),dim=1).view(batch_size, -1, in_len)
 
         # (batch, query_len, in_len) * (batch, in_len, dim) -> (batch, query_len, dim)
+        #print("attn_scores: " + str(attn_scores.shape))
         attn_out = torch.bmm(attn_scores, context)
 
         return attn_out, attn_scores

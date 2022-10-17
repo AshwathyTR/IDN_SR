@@ -56,7 +56,8 @@ class AttnRNNR(BasicModule):
     def forward(self,x,doc_lens):
         N = x.size(0)
         L = x.size(1)
-        B = len(doc_lens)
+        B = int(N/self.args.pos_num)
+        #B = len(doc_lens)
         H = self.args.hidden_size
         word_mask = torch.ones_like(x) - torch.sign(x)
         word_mask = word_mask.data.type(torch.cuda.ByteTensor).view(N,1,L)
@@ -74,6 +75,7 @@ class AttnRNNR(BasicModule):
         sent_out = self.sent_RNN(x)[0]                                           # (B,max_doc_len,2*H)
         #docs = self.avg_pool1d(sent_out,doc_lens)                               # (B,2*H)
         max_doc_len = max(doc_lens)
+        #max_doc_len = self.args.pos_num
         mask = torch.ones(B,max_doc_len)
         for i in range(B):
             for j in range(doc_lens[i]):
@@ -88,7 +90,8 @@ class AttnRNNR(BasicModule):
         at_scores = at_scores.squeeze(1)
         probs = []
         
-        for index,doc_len in enumerate(doc_lens):
+        for index in range(0,B):
+            doc_len = self.args.pos_num
             valid_hidden = sent_out[index,:doc_len,:]                            # (doc_len,2*H)
             doc = F.tanh(self.fc(docs[index])).unsqueeze(0)
             s = Variable(torch.zeros(1,2*H))

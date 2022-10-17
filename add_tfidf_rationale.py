@@ -2,6 +2,7 @@ import json
 import sys
 import os
 from sklearn.feature_extraction.text import TfidfVectorizer
+import pickle
 vectorizer = TfidfVectorizer()
 dpath = sys.argv[1]
 split = sys.argv[2]
@@ -34,17 +35,28 @@ for doc_id, text in enumerate(h):
     w = sum([sent.split(' ') for sent in s],[])
     word_index = 0
     tf_idf = dict(zip(vectorizer.get_feature_names(), X.toarray()[doc_id]))
+    choice_tf_idf = {}
+    #print(tf_idf.keys())
+    for index, sentence in enumerate(s):
+        
+        for w_index, word in enumerate(sentence.split(' ')):
+            word_index = word_index +1
+            window = ' '.join(w[max(0,word_index - look_behind) : word_index + look_ahead])
+
+            if 'choice :' in window.lower() and word in tf_idf.keys():
+                choice_tf_idf[word] = tf_idf[word]
+
     for index, sentence in enumerate(s):
         sentence_r = []
         for w_index, word in enumerate(sentence.split(' ')):
             word_index = word_index +1
             window = ' '.join(w[max(0,word_index - look_behind) : word_index + look_ahead])
              
-            if 'choice :' in window.lower():
-                sentence_r.append(str(tf_idf[word]))
-                #print(index)
+            if word not in choice_tf_idf.keys():
+                    sentence_r.append("0.0")
             else:
-                sentence_r.append(str(0.0))
+                    sentence_r.append(str(choice_tf_idf[word]))
+            
         sentence_r = ' '.join(sentence_r)
         r.append(sentence_r)
     r = '\n'.join(r)
