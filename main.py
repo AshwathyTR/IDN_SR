@@ -15,7 +15,7 @@ from time import time
 from tqdm import tqdm
 #from torch.utils.tensorboard import SummaryWriter
 #writer = SummaryWriter()
-
+import pickle
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [INFO] %(message)s')
 parser = argparse.ArgumentParser(description='extractive summary')
 # model
@@ -75,31 +75,57 @@ def eval(net,vocab,data_iter,criterion):
     net.eval()
     total_loss = 0
     batch_num = 0
-    if args.model == 'AttnRNNW':
-                rationale_type = 'word'
-    elif args.model == 'AttnRNNR':
-                rationale_type = 'sent'
-    else:
-                rationale_type = None
+    
     for batch in data_iter:
-        features,targets,rationale,_,doc_lens = vocab.make_features(batch,  doc_trunc = args.pos_num, rationale_type = rationale_type)
-        features,targets,rationale = Variable(features), Variable(targets.float()), Variable(rationale.float())
+        features,targets,rationale_s, rationale_w,_,doc_lens = vocab.make_features(batch,  doc_trunc = args.pos_num)
+        features,targets,rationale_s, rationale_w = Variable(features), Variable(targets.float()), Variable(rationale_s.float()), Variable(rationale_w.float())
         if use_gpu:
             features = features.cuda()
             targets = targets.cuda()
-            rationale = rationale.cuda()
-        if args.model == 'AttnRNNR' or args.model == 'AttnRNNW':
-            probs,alpha = net(features,doc_lens)
-            alpha = alpha.view(rationale.shape)
+            rationale_s = rationale_s.cuda()
+            rationale_w = rationale_w.cuda()
+        
+        if 'AttnRNNRW' in args.model:
+                probs, alpha_s, alpha_w = net(features,doc_lens)
+                alpha_s = alpha_s.view(rationale_s.shape)
+                alpha_w = alpha_w.view(rationale_w.shape)
+        elif 'AttnRNNR' in args.model:
+                probs, alpha = net(features,doc_lens)
+                alpha = alpha.view(rationale_s.shape)
+                rationale = rationale_s
+        elif 'AttnRNNW' in args.model:
+                probs, alpha = net(features,doc_lens)
+                alpha = alpha.view(rationale_w.shape)
+                rationale = rationale_w
+        
         else:
-            probs = net(features,doc_lens)
-        #print('features'+str(features.shape))
-        #print('targets'+str(targets.shape))
-        #print('probs'+str(probs.shape))
-        if args.model == 'AttnRNNR' or args.model == 'AttnRNNW':
-                loss = args.alpha_loss * criterion(probs,targets)+ (1 - args.alpha_loss) * criterion(alpha, rationale)
+                probs = net(features,doc_lens)
+        
+        if 'AttnRNNRW' in args.model:
+                 Ll = criterion(probs,targets)
+                 Ls =  criterion(alpha_s, rationale_s)
+                 Lw = criterion(alpha_w, rationale_w)
+                 #Ll = 10 * Ll
+                 #Lw = 3 * Lw
+                 #logging.info("Ll :" + str(Ll))
+                 #logging.info("Ls :" + str(Ls))
+                 #logging.info("Lw :" + str(Lw))
+                 loss = args.alpha_loss * Ll+ (1 - args.alpha_loss)/2 *Ls + (1 - args.alpha_loss)/2 * Lw
+
+        elif 'AttnRNNR' in args.model or 'AttnRNNW' in args.model:
+                Ll = criterion(probs,targets)
+                Lr =  criterion(alpha, rationale)
+                #Ll = 10 * Ll
+                #Lr = 3 * Lr if 'AttnRNNW' in args.model else Lr
+                #Lw = criterion(alpha_w, rationale_w)
+                #logging.info("Ll :" + str(Ll))
+                #logging.info("Lr :" + str(Lr))
+                #print("Lw :" + str(Lw))
+                loss = args.alpha_loss * Ll+ (1 - args.alpha_loss) * Lr
+        
         else:
                 loss = criterion(probs,targets)
+
             
         total_loss += loss.data
         batch_num += 1
@@ -155,36 +181,59 @@ def train():
         for i,batch in enumerate(train_iter):
             logging.info(str(i))
             logging.info('test')
-            if args.model == 'AttnRNNW':
-                rationale_type = 'word'
-            elif args.model == 'AttnRNNR':
-                rationale_type = 'sent'
-            else:
-                rationale_type = None
-            features,targets,rationale,_,doc_lens = vocab.make_features(batch, doc_trunc = args.pos_num, rationale_type = rationale_type)
-            features,targets,rationale = Variable(features), Variable(targets.float()), Variable(rationale.float())
-            logging.info("rationale: "+ str(rationale.shape))
+            features,targets,rationale_s, rationale_w,_,doc_lens = vocab.make_features(batch, doc_trunc = args.pos_num)
+            features,targets,rationale_s, rationale_w = Variable(features), Variable(targets.float()), Variable(rationale_s.float()),  Variable(rationale_w.float())
+            logging.info("rationale_s: "+ str(rationale_s.shape))
+            logging.info("rationale_w: "+ str(rationale_w.shape))
             logging.info("features: "+ str(features.shape))
             logging.info("targets: "+ str(targets.shape))
             if use_gpu:
                 features = features.cuda()
                 targets = targets.cuda()
-                rationale = rationale.cuda()
-            if args.model == 'AttnRNNW':
-                rationale_type = 'word'
-            elif args.model == 'AttnRNNR':
-                rationale_type = 'sent'
-            else:
-                rationale_type = None
-            if args.model == 'AttnRNNR' or args.model == 'AttnRNNW':
+                rationale_s= rationale_s.cuda()
+                rationale_w = rationale_w.cuda()
+            
+            if 'AttnRNNRW' in args.model :
+                probs, alpha_s, alpha_w = net(features,doc_lens)
+                alpha_s = alpha_s.view(rationale_s.shape)
+                alpha_w = alpha_w.view(rationale_w.shape)
+            elif 'AttnRNNR' in args.model :
                 probs, alpha = net(features,doc_lens)
-                logging.info('probs:'+str(probs.shape))
-                logging.info('alpha:'+str(alpha.shape))
-                alpha = alpha.view(rationale.shape)
+                alpha = alpha.view(rationale_s.shape)
+                rationale = rationale_s
+            elif 'AttnRNNW' in args.model :
+                probs, alpha = net(features,doc_lens)
+                alpha = alpha.view(rationale_w.shape)
+                rationale = rationale_w
             else:
                 probs = net(features,doc_lens)
-            if args.model == 'AttnRNNR' or args.model == 'AttnRNNW':
-                loss = args.alpha_loss * criterion(probs,targets)+ (1 - args.alpha_loss) * criterion(alpha, rationale)
+            if 'AttnRNNRW' in args.model:
+                Ll = criterion(probs,targets)
+                Ls =  criterion(alpha_s, rationale_s)
+                Lw = criterion(alpha_w, rationale_w)
+                #logging.info("Ll :" + str(Ll))
+                #logging.info("Ls :" + str(Ls))
+                #logging.info("Lw :" + str(Lw))
+                #sLl = 10 * Ll
+                #sLs = Ls
+                #sLw = 3 * Lw
+                logging.info("Ll :" + str(Ll))
+                logging.info("Ls :" + str(Ls))
+                logging.info("Lw :" + str(Lw))
+                #print("Ll :" + str(Ll))
+                #print("Ls :" + str(Ls))
+                #print("Lw :" + str(Lw))
+                loss = args.alpha_loss * Ll+ (1 - args.alpha_loss)/2 * Ls + (1 - args.alpha_loss)/2 * Lw
+            elif 'AttnRNNR' in args.model or 'AttnRNNW' in args.model:
+                Ll = criterion(probs,targets)
+                Lr =  criterion(alpha, rationale)
+                #sLl = 10 * Ll 
+                #sLr = 3 * Lr if 'AttnRNNW' in args.model else Lr
+                #Lw = criterion(alpha_w, rationale_w)
+                logging.info("Ll :" + str(Ll))
+                logging.info("Lr :" + str(Lr))
+                loss = args.alpha_loss * Ll+ (1 - args.alpha_loss) * Lr
+            
             else:
                 loss = criterion(probs,targets)
             #writer.add_scalar("Loss/train", loss, epoch)
@@ -240,41 +289,45 @@ def test():
     net.load_state_dict(checkpoint['model'])
     if use_gpu:
         net.cuda()
+    print("before eval")
     net.eval()
-    
+    print("after eval")
     doc_num = len(test_dataset)
     time_cost = 0
     file_id = 1
-    if args.model == 'AttnRNNW':
-                rationale_type = 'word'
-    elif args.model == 'AttnRNNR':
-                rationale_type = 'sent'
-    else:
-                rationale_type = None
+   
     with open(os.path.join(args.ref,'ref.txt'), 'w') as f:
          pass
     with open(os.path.join(args.hyp,'hyp.txt'), 'w') as f:
          pass
+    at = []
     for batch in tqdm(test_iter):
         #print("pos_num: "+ str(args.pos_num))
-        features,rationale,_,summaries,doc_lens = vocab.make_features(batch, doc_trunc = args.pos_num, rationale_type = rationale_type)
+        features,rationale_s, rationale_w,_,summaries,doc_lens = vocab.make_features(batch, doc_trunc = args.pos_num)
         #print(doc_lens)
         t1 = time()
         if use_gpu:
             features = Variable(features).cuda()
         else:
             features = Variable(features)
-        if args.model == 'AttnRNNR' or args.model == 'AttnRNNW':
+        if 'AttnRNNRW' in args.model:
+            probs, alpha_s, alpha_w = net(features, doc_lens)
+        elif 'AttnRNNR' in args.model or 'AttnRNNW' in args.model:
             probs, alpha = net(features, doc_lens)
+        
         else:
             probs = net(features, doc_lens)
         t2 = time()
         time_cost += t2 - t1
         start = 0
+    
         for doc_id,doc_len in enumerate(doc_lens):
             stop = start + doc_len
             prob = probs[start:stop]
-            #print(prob)
+            if  'AttnRNN' in args.model:
+                alpha = alpha[start:stop]
+                at_indices = alpha.topk(doc_len)[1].cpu().data.numpy()
+                at.append(at_indices)#print(prob)
             topk = min(args.topk,doc_len)
             topk_indices = prob.topk(topk)[1].cpu().data.numpy()
             topk_indices.sort()
@@ -287,6 +340,8 @@ def test():
                 f.write('\n'.join(hyp)+'<<END>>')
             start = stop
             file_id = file_id + 1
+    with open(os.path.join(args.ref,'att.pkl'), 'wb') as f:
+                pickle.dump(at,f)
     print('Speed: %.2f docs / s' % (doc_num / time_cost))
 
 

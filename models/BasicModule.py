@@ -22,7 +22,7 @@ class BasicModule(torch.nn.Module):
             #print('valid'+str(valid.shape))
             start = stop
             if valid.shape[0] != doc_len:
-                #print('not valid'+str(doc_len)+' '+str(valid.shape[0]))
+                print('not valid'+str(doc_len)+' '+str(valid.shape[0]))
                 continue
             #if valid.shape[0] == 0:
             #    continue
@@ -41,10 +41,13 @@ class BasicModule(torch.nn.Module):
     
     def save(self):
         checkpoint = {'model':self.state_dict(), 'args': self.args}
-        if self.model_name == 'AttnRNNR':
-            best_path = '%s%s_seed_%d_alpha_%f.pt' % (self.args.save_dir,self.model_name,self.args.seed, self.args.alpha_loss)
-        elif self.model_name == 'AttnRNNW':
+        if 'AttnRNNRW' in self.model_name:
+            best_path = '%s%s_seed_%d_alpharw_%f.pt' % (self.args.save_dir,self.model_name,self.args.seed, self.args.alpha_loss)
+        elif 'AttnRNNW' in self.model_name:
             best_path = '%s%s_seed_%d_alphaw_%f.pt' % (self.args.save_dir,self.model_name,self.args.seed, self.args.alpha_loss)
+        elif 'AttnRNNR' in self.model_name:
+            best_path = '%s%s_seed_%d_alpha_%f.pt' % (self.args.save_dir,self.model_name,self.args.seed, self.args.alpha_loss)
+        
         else:
             best_path = '%s%s_seed_%d.pt' % (self.args.save_dir,self.model_name,self.args.seed)
         torch.save(checkpoint,best_path)

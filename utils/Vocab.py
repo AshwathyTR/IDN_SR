@@ -22,49 +22,50 @@ class Vocab():
         else:
             return self.UNK_IDX
     
-    def make_features(self,batch,sent_trunc=50,doc_trunc=100,split_token='\n', rationale_type = None):
-        sents_list,targets,rationale_targets,doc_lens,word_rationales = [],[],[],[],[]
+    def make_features(self,batch,sent_trunc=50,doc_trunc=100,split_token='\n'):
+        sents_list,targets,rationale_s_targets,rationale_w_targets, doc_lens,word_rationales = [],[],[],[],[],[]
         # trunc document
         #print(rationale_type)
-        for doc,rationale,label in zip(batch['doc'],batch['rationale'],batch['labels']):
+        for doc,rationale_s,rationale_w,label in zip(batch['doc'],batch['rationale_s'], batch['rationale_w'],batch['labels']):
             sents = doc.split(split_token)
             labels = label.split(split_token)
             labels = [int(l) for l in labels]
             assert len(sents) == len(labels)
-            if rationale_type == 'sent':
-                rationale_labels = rationale.split(split_token)
-                rationale_labels = [float(l) for l in rationale_labels]
-            elif rationale_type == 'word':
-                rationale_labels = rationale.split(split_token)
-                
+            rationale_s_labels = rationale_s.split(split_token)
+            rationale_s_labels = [float(l) for l in rationale_s_labels]
+            assert len(rationale_s_labels) == len(sents)
+            rationale_w_labels = rationale_w.split(split_token)
+            assert len(rationale_w_labels) == len(sents)
             max_sent_num = doc_trunc
             sents = sents[:max_sent_num]
             labels = labels[:max_sent_num]
-            assert len(sents) == len(labels)
-            if rationale_type:
-                rationale_labels = rationale_labels[:max_sent_num]
-                assert len(sents) == len(rationale_labels)
+            #assert len(sents) == len(labels)
+            rationale_s_labels = rationale_s_labels[:max_sent_num]
+            rationale_w_labels = rationale_w_labels[:max_sent_num]
+            #assert len(sents) == len(rationale_labels)
             if len(sents) < doc_trunc:
                 #print('sentlen'+str(len(sents)))
-                pad = ['\n']* (doc_trunc - len(sents))
+                pad = ['.']* (doc_trunc - len(sents))
                 #print('padsentlen'+str(len(sents)))
                 #print('labellen'+str(len(labels)))
                 labels_pad = [0]*(doc_trunc - len(sents))
-                if rationale_type:
-                    rationale_pad =  ['0']*(doc_trunc - len(sents))
-                    rationale_labels = rationale_labels + rationale_pad
+                rationale_w_pad =  ['0.0']*(doc_trunc - len(sents))
+                rationale_w_labels = rationale_w_labels + rationale_w_pad
+                rationale_s_pad =  [0]*(doc_trunc - len(sents))
+                rationale_s_labels = rationale_s_labels + rationale_s_pad
                 sents = sents+pad
                 labels = labels + labels_pad
                 #print('labelpadlen'+str(labels))
                 #print(labels_pad)
                 assert len(sents) == len(labels)
-                if rationale_type:
-                    rationale_pad =  ['0']*(doc_trunc - len(sents))
-                    rationale_labels = rationale_labels + rationale_pad
+                assert len(sents) == len(rationale_s_labels)
+                assert len(sents) == len(rationale_w_labels)
+                #    rationale_pad =  ['0']*(doc_trunc - len(sents))
+                #    rationale_labels = rationale_labels + rationale_pad
             sents_list += sents
             targets += labels
-            if rationale_type:
-                rationale_targets += rationale_labels
+            rationale_s_targets += rationale_s_labels
+            rationale_w_targets += rationale_w_labels
             doc_lens.append(len(sents))
             
            
@@ -72,19 +73,18 @@ class Vocab():
         max_sent_len = 0
         batch_sents = []
         max_rationale_len =0 
-        if rationale_type == 'sent':
-            rationales = rationale_targets
-        elif rationale_type == 'word':
-            batch_rationales = []
-            for sent_rationale in rationale_targets:
+        s_rationales = rationale_s_targets
+        batch_rationales = []
+        for sent_rationale in rationale_w_targets:
                 word_rationales = sent_rationale.split(' ')
-                #print('r'+str(len(word_rationales)))
+                #print('r_len'+str(len(word_rationales)))
                 if len(word_rationales) > sent_trunc:
                     word_rationales = word_rationales[:sent_trunc]
                 max_rationale_len = len(word_rationales) if len(word_rationales) > max_rationale_len else max_rationale_len
+                #print(word_rationales)
                 word_rationales = [float(word_rationale) for word_rationale in word_rationales]
                 batch_rationales.append(word_rationales) 
-        #print('batch_rationale'+str(batch_rationales))    
+        #print('b_len'+str(len(batch_rationales)))
         for sent in sents_list:
             words = sent.split(' ')
             #print('w'+str(len(words)))
@@ -96,31 +96,33 @@ class Vocab():
             batch_sents.append(words)
         #print('max sent:'+str(max_sent_len))
         #print('max r:'+str(max_rationale_len))
-        if rationale_type:
-            assert max_sent_len == max_rationale_len
+        #if rationale_type:
+        #    if not  max_sent_len == max_rationale_len:
+        #         print(max_sent_len)
+        #         print(max_rationale_len)
+        #    assert max_sent_len == max_rationale_len
         #print('max:'+str(max_sent_len))
         features = []
         for sent in batch_sents:
             feature = [self.w2i(w) for w in sent] + [self.PAD_IDX for _ in range(max_sent_len-len(sent))]
             features.append(feature)
-        if rationale_type == 'word':
-            rationales = []
-            for sent in batch_rationales:
+        
+        w_rationales = []
+        for sent in batch_rationales:
                 #print('sentence length:'+str(len(sent)))
                 
-                rationale = sent + [0 for _ in range(max_sent_len-len(sent))]
+                rationale = sent + [0.0 for _ in range(max_sent_len-len(sent))]
                 #print('rationale length:'+str(len(rationale)))
-                rationales.append(rationale)
-        
+                
+                w_rationales.append(rationale)
+        #print('w_rationales:'+str(len(w_rationales)))
         features = torch.LongTensor(features)    
         targets = torch.LongTensor(targets)
-        if rationale_type:
-            rationales =  torch.LongTensor(rationales)
-        else:
-            rationales = torch.LongTensor([])
+        w_rationales =  torch.FloatTensor(w_rationales) 
+        s_rationales = torch.LongTensor(s_rationales)
         summaries = batch['summaries']
 
-        return features,targets,rationales,summaries,doc_lens
+        return features,targets,s_rationales,w_rationales, summaries,doc_lens
 
     def make_predict_features(self, batch, sent_trunc=150, doc_trunc=100, split_token='. '):
         sents_list, doc_lens = [],[]
