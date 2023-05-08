@@ -29,7 +29,7 @@ class wordonlyAttnRNN(BasicModule):
 
         self.attn = Attention()
         self.word_query = nn.Parameter(torch.randn(1,1,2*H))
-        self.sent_query = nn.Parameter(torch.randn(1,1,2*H))
+        #self.sent_query = nn.Parameter(torch.randn(1,1,2*H))
 
         self.word_RNN = nn.GRU(
                         input_size = D,

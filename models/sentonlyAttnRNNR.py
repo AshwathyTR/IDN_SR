@@ -28,7 +28,7 @@ class sentonlyAttnRNNR(BasicModule):
             self.embed.weight.data.copy_(embed)
 
         self.attn = Attention()
-        self.word_query = nn.Parameter(torch.randn(1,1,2*H))
+        #self.word_query = nn.Parameter(torch.randn(1,1,2*H))
         self.sent_query = nn.Parameter(torch.randn(1,1,2*H))
 
         self.word_RNN = nn.GRU(

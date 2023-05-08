@@ -324,10 +324,10 @@ def test():
         for doc_id,doc_len in enumerate(doc_lens):
             stop = start + doc_len
             prob = probs[start:stop]
-            if  'AttnRNN' in args.model:
-                alpha = alpha[start:stop]
-                at_indices = alpha.topk(doc_len)[1].cpu().data.numpy()
-                at.append(at_indices)#print(prob)
+            #if  'AttnRNN' in args.model:
+            #    alpha = alpha[start:stop]
+            #    at_indices = alpha.topk(doc_len)[1].cpu().data.numpy()
+            #    at.append(at_indices)#print(prob)
             topk = min(args.topk,doc_len)
             topk_indices = prob.topk(topk)[1].cpu().data.numpy()
             topk_indices.sort()
@@ -340,8 +340,8 @@ def test():
                 f.write('\n'.join(hyp)+'<<END>>')
             start = stop
             file_id = file_id + 1
-    with open(os.path.join(args.ref,'att.pkl'), 'wb') as f:
-                pickle.dump(at,f)
+    #with open(os.path.join(args.ref,'att.pkl'), 'wb') as f:
+    #            pickle.dump(at,f)
     print('Speed: %.2f docs / s' % (doc_num / time_cost))
 
 
