@@ -63,7 +63,6 @@ class AttnRNN(BasicModule):
     def forward(self,x,doc_lens):
         N = x.size(0) #num_sentences_in_batch
         L = x.size(1) #max_sent_len
-        #B = len(doc_lens) #batch_size
         B = int(N/self.args.pos_num)
         H = self.args.hidden_size
         word_mask = torch.ones_like(x) - torch.sign(x)
@@ -72,29 +71,17 @@ class AttnRNN(BasicModule):
         else:
             word_mask = word_mask.data.view(N,1,L)
         x = self.embed(x)                                # (N,L,D)
-        #print(str(x.get_device())+str(N))
-        #print(str(x.get_device())+str(L))
-        #print(str(x.get_device())+str(doc_lens))
-        #print(D)
         x,_ = self.word_RNN(x)                          #(N,L,2*H) 
-        #x = self.dropout(x)
         # attention
-        #print(str(x.get_device())+'x shapre before attention:'+ str(x.shape))
         query = self.word_query.expand(N,-1,-1).contiguous()
         self.attn.set_mask(word_mask)
-        #print("query"+str(x.get_device())+ str(query.shape)) # (2000,1,400)
-        #print("context"+str(x.get_device())+ str(x.shape))   # (2000,50,400)
+
         word_out = self.attn(query,x)[0].squeeze(1)      # (N,2*H)
-        #print(str(x.get_device())+'word out shape:'+str(word_out.shape))
-        #print(str(x.get_device())+doc_lens)
+
         x = self.pad_doc(word_out,doc_lens)
-        #print(str(x.get_device())+'shape after padding'+str(x.shape))
+
         # sent level GRU
-        #x = word_out
-        sent_out = self.sent_RNN(x)[0]                                           # (B,max_doc_len,2*H)
-        #print('sentout'+str(sent_out.shape))
-        #sent_out = self.dropout(sent_out)
-        #docs = self.avg_pool1d(sent_out,doc_lens)                               # (B,2*H)
+        sent_out = self.sent_RNN(x)[0]                                           # (B,max_doc_len,2*H)                              # (B,2*H)
         max_doc_len = self.args.pos_num
         mask = torch.ones(B,max_doc_len)
         for i in range(B):

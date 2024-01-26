@@ -80,31 +80,28 @@ class wordonlyAttnRNN(BasicModule):
             word_mask = word_mask.data.type(torch.cuda.ByteTensor).view(N,1,L)
         else:
             word_mask = word_mask.data.view(N,1,L)
-        #word_mask = word_mask.data.type(torch.cuda.ByteTensor).view(N,1,L)
+
         
         x = self.embed(x)                                # (N,L,D)
         x,_ = self.word_RNN(x)
         
         # attention
-        #print("before query")
         query = self.word_query.expand(N,-1,-1).contiguous()
         self.attn.set_mask(word_mask)
         word_out, word_scores = self.attn(query,x)
-        #print(word_scores.shape)
         word_out = word_out.squeeze(1)      # (N,2*H)
         word_scores = word_scores.squeeze(1)
-        #print(word_scores.shape)
-        #print("before pad")
+
         x = self.pad_doc(word_out,doc_lens)
         # sent level GRU
         sent_out = self.sent_RNN(x)[0]                                           # (B,max_doc_len,2*H)
-        #docs = self.avg_pool1d(sent_out,doc_lens)                               # (B,2*H)
+
         max_doc_len = max(doc_lens)
         docs = self.max_pool1d(sent_out,doc_lens)
         probs = []
-        #print("before loop")
+
         for index in range(0,B):
-            #print(index)
+
             doc_len = self.args.pos_num
             valid_hidden = sent_out[index,:doc_len,:]                            # (doc_len,2*H)
             doc = F.tanh(self.fc(docs[index])).unsqueeze(0)

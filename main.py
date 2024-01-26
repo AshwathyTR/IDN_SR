@@ -33,7 +33,7 @@ parser.add_argument('-hidden_size',type=int,default=200)
 parser.add_argument('-lr',type=float,default=1e-3)
 parser.add_argument('-batch_size',type=int,default=32)
 parser.add_argument('-epochs',type=int,default=5)
-parser.add_argument('-seed',type=int,default=1)
+parser.add_argument('-seed',type=int,default=66)
 parser.add_argument('-train_dir',type=str,default='data/train.json')
 parser.add_argument('-val_dir',type=str,default='data/val.json')
 parser.add_argument('-embedding',type=str,default='data/embedding.npz')
@@ -70,7 +70,8 @@ torch.cuda.manual_seed(args.seed)
 torch.manual_seed(args.seed)
 random.seed(args.seed)
 numpy.random.seed(args.seed) 
-    
+#torch.backends.cudnn.deterministic = True    
+#torch.backends.cudnn.benchmark = False
 def eval(net,vocab,data_iter,criterion):
     net.eval()
     total_loss = 0
@@ -180,13 +181,8 @@ def train():
     for epoch in range(1,args.epochs+1):
         for i,batch in enumerate(train_iter):
             logging.info(str(i))
-            logging.info('test')
             features,targets,rationale_s, rationale_w,_,doc_lens = vocab.make_features(batch, doc_trunc = args.pos_num)
             features,targets,rationale_s, rationale_w = Variable(features), Variable(targets.float()), Variable(rationale_s.float()),  Variable(rationale_w.float())
-            logging.info("rationale_s: "+ str(rationale_s.shape))
-            logging.info("rationale_w: "+ str(rationale_w.shape))
-            logging.info("features: "+ str(features.shape))
-            logging.info("targets: "+ str(targets.shape))
             if use_gpu:
                 features = features.cuda()
                 targets = targets.cuda()
@@ -211,48 +207,23 @@ def train():
                 Ll = criterion(probs,targets)
                 Ls =  criterion(alpha_s, rationale_s)
                 Lw = criterion(alpha_w, rationale_w)
-                #logging.info("Ll :" + str(Ll))
-                #logging.info("Ls :" + str(Ls))
-                #logging.info("Lw :" + str(Lw))
-                #sLl = 10 * Ll
-                #sLs = Ls
-                #sLw = 3 * Lw
-                logging.info("Ll :" + str(Ll))
-                logging.info("Ls :" + str(Ls))
-                logging.info("Lw :" + str(Lw))
-                #print("Ll :" + str(Ll))
-                #print("Ls :" + str(Ls))
-                #print("Lw :" + str(Lw))
                 loss = args.alpha_loss * Ll+ (1 - args.alpha_loss)/2 * Ls + (1 - args.alpha_loss)/2 * Lw
             elif 'AttnRNNR' in args.model or 'AttnRNNW' in args.model:
                 Ll = criterion(probs,targets)
                 Lr =  criterion(alpha, rationale)
-                #sLl = 10 * Ll 
-                #sLr = 3 * Lr if 'AttnRNNW' in args.model else Lr
-                #Lw = criterion(alpha_w, rationale_w)
-                logging.info("Ll :" + str(Ll))
-                logging.info("Lr :" + str(Lr))
                 loss = args.alpha_loss * Ll+ (1 - args.alpha_loss) * Lr
             
             else:
                 loss = criterion(probs,targets)
-            #writer.add_scalar("Loss/train", loss, epoch)
-            #logging.info('optim')
             optimizer.zero_grad()
-            #logging.info('optim1')
             loss.backward()
-            #logging.info('optim2')
             clip_grad_norm(net.parameters(), args.max_norm)
-            #logging.info('optim3')
             optimizer.step()
-            #logging.info('optim done')
             if args.debug:
                 print('Batch ID:%d Loss:%f' %(i,loss.data[0]))
                 continue
             if i % args.report_every == 0:
                 cur_loss = eval(net,vocab,val_iter,criterion)
-                #print(cur_loss)
-                #print(min_loss)
                 if cur_loss < min_loss:
                     min_loss = cur_loss
                     best_path = net.module.save()
@@ -302,9 +273,8 @@ def test():
          pass
     at = []
     for batch in tqdm(test_iter):
-        #print("pos_num: "+ str(args.pos_num))
+        
         features,rationale_s, rationale_w,_,summaries,doc_lens = vocab.make_features(batch, doc_trunc = args.pos_num)
-        #print(doc_lens)
         t1 = time()
         if use_gpu:
             features = Variable(features).cuda()
@@ -324,14 +294,12 @@ def test():
         for doc_id,doc_len in enumerate(doc_lens):
             stop = start + doc_len
             prob = probs[start:stop]
-            #if  'AttnRNN' in args.model:
-            #    alpha = alpha[start:stop]
-            #    at_indices = alpha.topk(doc_len)[1].cpu().data.numpy()
-            #    at.append(at_indices)#print(prob)
             topk = min(args.topk,doc_len)
             topk_indices = prob.topk(topk)[1].cpu().data.numpy()
             topk_indices.sort()
             doc = batch['doc'][doc_id].split('\n')[:doc_len]
+            print(len(doc))
+            print(topk_indices)
             hyp = [doc[index] for index in topk_indices]
             ref = summaries[doc_id]
             with open(os.path.join(args.ref,'ref.txt'), 'a') as f:
@@ -340,8 +308,6 @@ def test():
                 f.write('\n'.join(hyp)+'<<END>>')
             start = stop
             file_id = file_id + 1
-    #with open(os.path.join(args.ref,'att.pkl'), 'wb') as f:
-    #            pickle.dump(at,f)
     print('Speed: %.2f docs / s' % (doc_num / time_cost))
 
 

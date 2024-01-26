@@ -50,8 +50,6 @@ class Attention(nn.Module):
         batch_size = query.size(0)
         dim = query.size(2)
         in_len = context.size(1)
-        #print("query"+str(query.shape))
-        #print("context"+str(context.shape))
         # (batch, query_len, dim) * (batch, in_len, dim) -> (batch, query_len, in_len)
         attn = torch.bmm(query, context.transpose(1, 2))
         if self.mask is not None:
@@ -59,7 +57,6 @@ class Attention(nn.Module):
         attn_scores = F.softmax(attn.view(-1, in_len),dim=1).view(batch_size, -1, in_len)
 
         # (batch, query_len, in_len) * (batch, in_len, dim) -> (batch, query_len, dim)
-        #print("attn_scores: " + str(attn_scores.shape))
         attn_out = torch.bmm(attn_scores, context)
 
         return attn_out, attn_scores

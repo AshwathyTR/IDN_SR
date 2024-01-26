@@ -69,14 +69,11 @@ class AttnRNNRW(BasicModule):
         query = self.word_query.expand(N,-1,-1).contiguous()
         self.attn.set_mask(word_mask)
         word_out, word_scores = self.attn(query,x)
-        #print(word_scores.shape)
         word_out = word_out.squeeze(1)      # (N,2*H)
         word_scores = word_scores.squeeze(1)
-        #print(word_scores.shape)
         x = self.pad_doc(word_out,doc_lens)
         # sent level GRU
         sent_out = self.sent_RNN(x)[0]                                           # (B,max_doc_len,2*H)
-        #docs = self.avg_pool1d(sent_out,doc_lens)                               # (B,2*H)
         max_doc_len = max(doc_lens)
         mask = torch.ones(B,max_doc_len)
         for i in range(B):
